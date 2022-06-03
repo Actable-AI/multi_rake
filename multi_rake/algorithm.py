@@ -1,3 +1,4 @@
+import re
 import operator
 from collections import Counter, defaultdict
 
@@ -5,7 +6,7 @@ import numpy as np
 
 from multi_rake.stopwords import STOPWORDS
 from multi_rake.utils import (
-    detect_language, keep_only_letters, separate_words, split_sentences,
+    detect_language, keep_only_letters, separate_words, split_sentences, TextSegment
 )
 
 
@@ -51,15 +52,19 @@ class Rake:
             self.stopwords = STOPWORDS.get(language_code, set())
 
     def apply(self, text, text_for_stopwords=None):
-        text = text.lower()
+        sentence_list = split_sentences(text)
+        return self.apply_sentences(sentence_list, text_for_stopwords)
 
+    def apply_sentences(self, sentence_list, text_for_stopwords=None):
+        sentence_list = [s.lower() for s in sentence_list]
         max_words = self.max_words
 
         if self.stopwords:
             stop_words = self.stopwords
 
         else:
-            language_code = detect_language(text, self.lang_detect_threshold)
+            language_code = detect_language('. '.join(sentence_list[:1000]),
+                                            self.lang_detect_threshold)
 
             if language_code is not None and language_code in STOPWORDS:
                 stop_words = STOPWORDS[language_code]
@@ -67,16 +72,14 @@ class Rake:
             else:
                 if text_for_stopwords:
                     text_for_stopwords = text_for_stopwords.lower()
-                    text_for_stopwords = ' '.join([text, text_for_stopwords])
+                    text_for_stopwords = '. '.join(sentence_list[:1000] + [text_for_stopwords])
                 else:
-                    text_for_stopwords = text
+                    text_for_stopwords = '. '.join(sentence_list[:1000])
 
                 stop_words = self._generate_stop_words(text_for_stopwords)
 
                 if self.max_words_unknown_lang is not None:
                     max_words = self.max_words_unknown_lang
-
-        sentence_list = split_sentences(text)
 
         phrase_list = self._generate_candidate_keywords(
             sentence_list,
@@ -97,7 +100,7 @@ class Rake:
             reverse=True,
         )
 
-        return keywords
+        return keywords, phrase_list
 
     def _generate_stop_words(self, text):
         stop_words = set()
@@ -128,35 +131,43 @@ class Rake:
 
         return stop_words
 
+    def _phrase_candidate(self, word_list, sentence_id):
+        return TextSegment(
+            ' '.join([w.text for w in word_list]),
+            sentence_id,
+            word_list[0].start_position,
+            word_list[-1].end_position,
+        )
+
     def _generate_candidate_keywords(
         self,
         sentence_list,
         stop_words,
-        max_words,
-    ):
+        max_words,):
         result = []
         phrases = []
 
-        for sentence in sentence_list:
+        for i, sentence in enumerate(sentence_list):
             tmp = []
 
-            for word in sentence.split():
-                if word in stop_words:
+            for m in re.finditer(r'\S+', sentence):
+                word = TextSegment(m.group(0), i, m.start(), m.end())
+                if word.text in stop_words:
                     if tmp:
-                        phrases.append(' '.join(tmp))
+                        phrases.append(self._phrase_candidate(tmp, i))
                         tmp = []
 
                 else:
                     tmp.append(word)
 
             if tmp:
-                phrases.append(' '.join(tmp))
+                phrases.append(self._phrase_candidate(tmp, i))
 
         for phrase in phrases:
             if (
                     phrase
-                    and len(phrase) >= self.min_chars
-                    and len(phrase.split()) <= max_words
+                    and len(phrase.text) >= self.min_chars
+                    and len(phrase.text.split()) <= max_words
             ):
                 result.append(phrase)
 
@@ -167,7 +178,7 @@ class Rake:
 
         for phrase in phrase_list:
             if phrase_list.count(phrase) >= self.min_freq:
-                word_list = separate_words(phrase)
+                word_list = separate_words(phrase.text)
                 candidate_score = 0
 
                 for word in word_list:
@@ -183,7 +194,7 @@ class Rake:
         word_degree = defaultdict(int)
 
         for phrase in phrase_list:
-            word_list = separate_words(phrase)
+            word_list = separate_words(phrase.text)
             word_list_length = len(word_list)
             word_list_degree = word_list_length - 1
 
