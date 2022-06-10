@@ -3,6 +3,8 @@ import operator
 from collections import Counter, defaultdict
 
 import numpy as np
+from nltk.tokenize.destructive import NLTKWordTokenizer
+import nltk
 
 from multi_rake.stopwords import STOPWORDS
 from multi_rake.utils import (
@@ -63,7 +65,7 @@ class Rake:
             stop_words = self.stopwords
 
         else:
-            language_code = detect_language('. '.join(sentence_list[:1000]),
+            language_code, language = detect_language('\n'.join(sentence_list[:1000]),
                                             self.lang_detect_threshold)
 
             if language_code is not None and language_code in STOPWORDS:
@@ -85,6 +87,7 @@ class Rake:
             sentence_list,
             stop_words,
             max_words,
+            language,
         )
 
         word_scores = Rake._calculate_word_scores(phrase_list)
@@ -131,9 +134,9 @@ class Rake:
 
         return stop_words
 
-    def _phrase_candidate(self, word_list, sentence_id):
+    def _phrase_candidate(self, sentence, word_list, sentence_id):
         return TextSegment(
-            ' '.join([w.text for w in word_list]),
+            sentence[word_list[0].start_position:word_list[-1].end_position],
             sentence_id,
             word_list[0].start_position,
             word_list[-1].end_position,
@@ -143,25 +146,32 @@ class Rake:
         self,
         sentence_list,
         stop_words,
-        max_words,):
+        max_words,
+        language,
+    ):
         result = []
         phrases = []
 
+        word_tokenizer = NLTKWordTokenizer()
         for i, sentence in enumerate(sentence_list):
             tmp = []
 
-            for m in re.finditer(r'\S+', sentence):
-                word = TextSegment(m.group(0), i, m.start(), m.end())
-                if word.text in stop_words:
+            word_spans = list(word_tokenizer.span_tokenize(sentence))
+            words = [sentence[start:end] for start, end in word_spans]
+            pos_tags = nltk.pos_tag(words)
+            for word, (start, end), (_, pos_tag) in zip(words, word_spans, pos_tags):
+                word_segment = TextSegment(word, i, start, end)
+                if word in stop_words \
+                        or pos_tag not in ["NN", "NNS", "NNP", "JJ", "JJR", "JJS"]:
                     if tmp:
-                        phrases.append(self._phrase_candidate(tmp, i))
+                        phrases.append(self._phrase_candidate(sentence, tmp, i))
                         tmp = []
 
                 else:
-                    tmp.append(word)
+                    tmp.append(word_segment)
 
             if tmp:
-                phrases.append(self._phrase_candidate(tmp, i))
+                phrases.append(self._phrase_candidate(sentence, tmp, i))
 
         for phrase in phrases:
             if (

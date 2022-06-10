@@ -30,11 +30,14 @@ class TextSegment(object):
 def detect_language(text, proba_threshold):
     _, _, details = pycld2.detect(text)
 
+    language = details[0][0].lower()
     language_code = details[0][1]
     probability = details[0][2]
 
     if language_code != 'un' and probability > proba_threshold:
-        return language_code
+        return language_code, language
+
+    return None, None
 
 
 def keep_only_letters(string):
