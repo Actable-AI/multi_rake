@@ -2,3 +2,4 @@ numpy>=1.14.4
 pycld2>=0.41
 pyrsistent>=0.14.2
 regex>=2018.6.6
+Arabic-Stopwords==0.3

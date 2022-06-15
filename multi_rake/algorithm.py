@@ -3,13 +3,17 @@ import operator
 from collections import Counter, defaultdict
 
 import numpy as np
-from nltk.tokenize.destructive import NLTKWordTokenizer
 import nltk
 
 from multi_rake.stopwords import STOPWORDS
 from multi_rake.utils import (
     detect_language, keep_only_letters, separate_words, split_sentences, TextSegment
 )
+from multi_rake.pos_tagger import  MultilingualPOSTagger
+
+
+class UnsupportedLanguageError(Exception):
+    pass
 
 
 class Rake:
@@ -53,6 +57,8 @@ class Rake:
         else:
             self.stopwords = STOPWORDS.get(language_code, set())
 
+        self.tagger = MultilingualPOSTagger()
+
     def apply(self, text, text_for_stopwords=None):
         sentence_list = split_sentences(text)
         return self.apply_sentences(sentence_list, text_for_stopwords)
@@ -61,13 +67,16 @@ class Rake:
         sentence_list = [s.lower() for s in sentence_list]
         max_words = self.max_words
 
+        language_code, language = detect_language('\n'.join(sentence_list[:1000]),
+                                                  self.lang_detect_threshold)
+
+        if language_code not in MultilingualPOSTagger.SUPPORTED_LANGUAGE_CODES:
+            raise UnsupportedLanguageError()
+
         if self.stopwords:
             stop_words = self.stopwords
 
         else:
-            language_code, language = detect_language('\n'.join(sentence_list[:1000]),
-                                            self.lang_detect_threshold)
-
             if language_code is not None and language_code in STOPWORDS:
                 stop_words = STOPWORDS[language_code]
 
@@ -87,7 +96,7 @@ class Rake:
             sentence_list,
             stop_words,
             max_words,
-            language,
+            language_code,
         )
 
         word_scores = Rake._calculate_word_scores(phrase_list)
@@ -152,17 +161,14 @@ class Rake:
         result = []
         phrases = []
 
-        word_tokenizer = NLTKWordTokenizer()
         for i, sentence in enumerate(sentence_list):
             tmp = []
 
-            word_spans = list(word_tokenizer.span_tokenize(sentence))
-            words = [sentence[start:end] for start, end in word_spans]
-            pos_tags = nltk.pos_tag(words)
-            for word, (start, end), (_, pos_tag) in zip(words, word_spans, pos_tags):
-                word_segment = TextSegment(word, i, start, end)
-                if word in stop_words \
-                        or pos_tag not in ["NN", "NNS", "NNP", "JJ", "JJR", "JJS"]:
+            for token in self.tagger.tag(sentence):
+                word_segment = TextSegment(
+                    token["word"], i, token["start_position"], token["end_position"])
+                if token["word"] in stop_words \
+                        or token["pos"] not in ["NOUN", "ADJ", "CCONJ", "X"]:
                     if tmp:
                         phrases.append(self._phrase_candidate(sentence, tmp, i))
                         tmp = []

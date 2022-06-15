@@ -1,4 +1,5 @@
 from pyrsistent import freeze
+import arabicstopwords.arabicstopwords as stp
 
 _STOPWORDS = {
     'bg': {
@@ -6873,6 +6874,7 @@ _STOPWORDS = {
         'якої',
         'якщо',
     },
+    'ar': set(stp.stopwords_list()),
 }
 
 _STOPWORDS.update({'bs': _STOPWORDS['hr']})
