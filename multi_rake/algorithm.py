@@ -13,7 +13,9 @@ from multi_rake.pos_tagger import  MultilingualPOSTagger
 
 
 class UnsupportedLanguageError(Exception):
-    pass
+
+    def __init__(self, language_code):
+        self.language_code = language_code
 
 
 class Rake:
@@ -71,7 +73,7 @@ class Rake:
                                                   self.lang_detect_threshold)
 
         if language_code not in MultilingualPOSTagger.SUPPORTED_LANGUAGE_CODES:
-            raise UnsupportedLanguageError()
+            raise UnsupportedLanguageError(language_code)
 
         if self.stopwords:
             stop_words = self.stopwords
