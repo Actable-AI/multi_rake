@@ -170,7 +170,7 @@ class Rake:
                 word_segment = TextSegment(
                     token["word"], i, token["start_position"], token["end_position"])
                 if token["word"] in stop_words \
-                        or token["pos"] not in ["NOUN", "ADJ", "CCONJ", "X"]:
+                        or token["pos"] not in ["NOUN", "PROPN", "ADJ", "CCONJ", "X"]:
                     if tmp:
                         phrases.append(self._phrase_candidate(sentence, tmp, i))
                         tmp = []
