@@ -164,7 +164,7 @@ class Rake:
         phrases = []
 
         for i, sentence in enumerate(sentence_list):
-            tmp = []
+            tmp, has_nouns = [], False
 
             for token in self.tagger.tag(sentence):
                 word_segment = TextSegment(
@@ -172,13 +172,17 @@ class Rake:
                 if token["word"] in stop_words \
                         or token["pos"] not in ["NOUN", "PROPN", "ADJ", "CCONJ", "X"]:
                     if tmp:
-                        phrases.append(self._phrase_candidate(sentence, tmp, i))
+                        if has_nouns:
+                            phrases.append(self._phrase_candidate(sentence, tmp, i))
                         tmp = []
+                        has_nouns = False
 
                 else:
                     tmp.append(word_segment)
+                    if token["pos"] in ["NOUN", "PROPN"]:
+                        has_nouns = True
 
-            if tmp:
+            if tmp and has_nouns:
                 phrases.append(self._phrase_candidate(sentence, tmp, i))
 
         for phrase in phrases:
