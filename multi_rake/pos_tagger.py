@@ -7,8 +7,12 @@ class MultilingualPOSTagger(object):
     SUPPORTED_LANGUAGE_CODES = ["en", "fr", "de", "it", "nl", "pl", "es", "sv", "da",
                                 "no", "fi", "cs"]
 
-    def __init__(self):
-        self.flair_tagger = SequenceTagger.load('pos-multi')
+    def __init__(self,
+                 flair_pos_model_path=None,
+                 flair_pos_supported_language_codes=None):
+        self.flair_tagger = SequenceTagger.load(flair_pos_model_path or 'pos-multi')
+        self.supported_language_codes = \
+            flair_pos_supported_language_codes or self.SUPPORTED_LANGUAGE_CODES
 
     def tag(self, sentence_raw):
         sentence = Sentence(sentence_raw)

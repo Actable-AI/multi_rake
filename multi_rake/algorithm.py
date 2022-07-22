@@ -31,6 +31,7 @@ class Rake:
         generated_stopwords_percentile=80,
         generated_stopwords_max_len=3,
         generated_stopwords_min_freq=2,
+        tagger=None,
     ):
         self.min_chars = min_chars
         self.max_words = max_words
@@ -59,7 +60,7 @@ class Rake:
         else:
             self.stopwords = STOPWORDS.get(language_code, set())
 
-        self.tagger = MultilingualPOSTagger()
+        self.tagger = tagger or MultilingualPOSTagger()
 
     def apply(self, text, text_for_stopwords=None):
         sentence_list = split_sentences(text)
@@ -72,7 +73,7 @@ class Rake:
         language_code, language = detect_language('\n'.join(sentence_list[:1000]),
                                                   self.lang_detect_threshold)
 
-        if language_code not in MultilingualPOSTagger.SUPPORTED_LANGUAGE_CODES:
+        if language_code not in self.tagger.supported_language_codes:
             raise UnsupportedLanguageError(language_code)
 
         if self.stopwords:
